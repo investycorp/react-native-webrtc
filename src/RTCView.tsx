@@ -1,4 +1,5 @@
-import { requireNativeComponent, ViewProps } from 'react-native';
+import React, { useImperativeHandle, useRef } from 'react';
+import { findNodeHandle, requireNativeComponent, NativeModules, ViewProps } from 'react-native';
 
 /**
  * Native prop validation was removed from RN in:
@@ -59,6 +60,56 @@ interface RTCVideoViewProps extends ViewProps {
    * zOrder: number
    */
   zOrder?: number;
+
+  onRecordingEnd?: (path: string) => void;
 }
 
-export default requireNativeComponent<RTCVideoViewProps>('RTCVideoView');
+const RTCVideoView = requireNativeComponent<RTCVideoViewProps>('RTCVideoView');
+const { UIManager } = NativeModules;
+
+if (UIManager) {
+    UIManager.genericDirectEventTypes = {
+        ...UIManager.genericDirectEventTypes,
+        onCaptureEnd: { registrationName: 'onCaptureEnd' },
+        onRecordingEnd: {
+            registrationName: 'onRecordingEnd',
+        },
+    };
+}
+
+const RTCView = (props: RTCVideoViewProps, ref) => {
+    const reactTag = useRef<number | null>(null);
+
+    useImperativeHandle(ref, () => {
+        return {
+            capture: () => {
+                console.log(reactTag);
+            },
+            startRecording: () => {
+                UIManager.dispatchViewManagerCommand(
+                    reactTag.current,
+                    UIManager.getViewManagerConfig('RTCVideoView').Commands.startRecording.toString(),
+                    []
+                );
+            },
+            stopRecording: () => {
+                UIManager.dispatchViewManagerCommand(
+                    reactTag.current,
+                    UIManager.getViewManagerConfig('RTCVideoView').Commands.stopRecording.toString(),
+                    []
+                );
+            },
+        };
+    });
+
+    return (
+        <RTCVideoView
+            ref={ref => {
+                reactTag.current = findNodeHandle(ref);
+            }}
+            {...props}
+        />
+    );
+};
+
+export default React.forwardRef(RTCView);

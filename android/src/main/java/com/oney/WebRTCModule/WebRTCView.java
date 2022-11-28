@@ -2,6 +2,7 @@ package com.oney.WebRTCModule;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.Point;
 
@@ -11,20 +12,28 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.util.Log;
 
+import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.ReactContext;
+import com.facebook.react.bridge.WritableMap;
+import com.facebook.react.uimanager.events.RCTEventEmitter;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 
 import org.webrtc.EglBase;
+import org.webrtc.EglRenderer;
 import org.webrtc.Logging;
 import org.webrtc.MediaStream;
 import org.webrtc.RendererCommon;
 import org.webrtc.RendererCommon.RendererEvents;
 import org.webrtc.RendererCommon.ScalingType;
 import org.webrtc.SurfaceViewRenderer;
+import org.webrtc.VideoFileRenderer;
+import org.webrtc.VideoFrame;
+import org.webrtc.VideoSink;
 import org.webrtc.VideoTrack;
 
 public class WebRTCView extends ViewGroup {
@@ -44,7 +53,7 @@ public class WebRTCView extends ViewGroup {
      * video represent nothing.
      */
     private static final ScalingType DEFAULT_SCALING_TYPE
-        = ScalingType.SCALE_ASPECT_FIT;
+            = ScalingType.SCALE_ASPECT_FIT;
 
     private static final String TAG = WebRTCModule.TAG;
 
@@ -98,21 +107,21 @@ public class WebRTCView extends ViewGroup {
      * {@link #surfaceViewRenderer}.
      */
     private final RendererEvents rendererEvents
-        = new RendererEvents() {
-            @Override
-            public void onFirstFrameRendered() {
-                WebRTCView.this.onFirstFrameRendered();
-            }
+            = new RendererEvents() {
+        @Override
+        public void onFirstFrameRendered() {
+            WebRTCView.this.onFirstFrameRendered();
+        }
 
-            @Override
-            public void onFrameResolutionChanged(
-                    int videoWidth, int videoHeight,
-                    int rotation) {
-                WebRTCView.this.onFrameResolutionChanged(
-                        videoWidth, videoHeight,
-                        rotation);
-            }
-        };
+        @Override
+        public void onFrameResolutionChanged(
+                int videoWidth, int videoHeight,
+                int rotation) {
+            WebRTCView.this.onFrameResolutionChanged(
+                    videoWidth, videoHeight,
+                    rotation);
+        }
+    };
 
     /**
      * The {@code Runnable} representation of
@@ -121,12 +130,12 @@ public class WebRTCView extends ViewGroup {
      * initializing new instances on every (method) call.
      */
     private final Runnable requestSurfaceViewRendererLayoutRunnable
-        = new Runnable() {
-            @Override
-            public void run() {
-                requestSurfaceViewRendererLayout();
-            }
-        };
+            = new Runnable() {
+        @Override
+        public void run() {
+            requestSurfaceViewRendererLayout();
+        }
+    };
 
     /**
      * The scaling type this {@code WebRTCView} is to apply to the video
@@ -152,7 +161,9 @@ public class WebRTCView extends ViewGroup {
      */
     private VideoTrack videoTrack;
 
-    public WebRTCView(Context context) {
+    private ReactContext reactContext;
+
+    public WebRTCView(ReactContext context) {
         super(context);
 
         surfaceViewRenderer = new SurfaceViewRenderer(context);
@@ -160,6 +171,8 @@ public class WebRTCView extends ViewGroup {
 
         setMirror(false);
         setScalingType(DEFAULT_SCALING_TYPE);
+
+        this.reactContext = context;
     }
 
     /**
@@ -177,7 +190,7 @@ public class WebRTCView extends ViewGroup {
         if (streamURL != null) {
             ReactContext reactContext = (ReactContext) getContext();
             WebRTCModule module
-                = reactContext.getNativeModule(WebRTCModule.class);
+                    = reactContext.getNativeModule(WebRTCModule.class);
             MediaStream stream = module.getStreamForReactTag(streamURL);
 
             if (stream != null) {
@@ -192,7 +205,7 @@ public class WebRTCView extends ViewGroup {
                 Log.w(TAG, "No video stream for react tag: " + streamURL);
             }
         }
-        
+
         return videoTrack;
     }
 
@@ -292,41 +305,41 @@ public class WebRTCView extends ViewGroup {
             }
 
             switch (scalingType) {
-            case SCALE_ASPECT_FILL:
-                // Fill this ViewGroup with surfaceViewRenderer and the latter
-                // will take care of filling itself with the video similarly to
-                // the cover value the CSS property object-fit.
-                r = width;
-                l = 0;
-                b = height;
-                t = 0;
-                break;
-            case SCALE_ASPECT_FIT:
-            default:
-                // Lay surfaceViewRenderer out inside this ViewGroup in accord
-                // with the contain value of the CSS property object-fit.
-                // SurfaceViewRenderer will fill itself with the video similarly
-                // to the cover or contain value of the CSS property object-fit
-                // (which will not matter, eventually).
-                if (frameHeight == 0 || frameWidth == 0) {
-                    l = t = r = b = 0;
-                } else {
-                    float frameAspectRatio
-                        = (frameRotation % 180 == 0)
-                            ? frameWidth / (float) frameHeight
-                            : frameHeight / (float) frameWidth;
-                    Point frameDisplaySize
-                        = RendererCommon.getDisplaySize(
+                case SCALE_ASPECT_FILL:
+                    // Fill this ViewGroup with surfaceViewRenderer and the latter
+                    // will take care of filling itself with the video similarly to
+                    // the cover value the CSS property object-fit.
+                    r = width;
+                    l = 0;
+                    b = height;
+                    t = 0;
+                    break;
+                case SCALE_ASPECT_FIT:
+                default:
+                    // Lay surfaceViewRenderer out inside this ViewGroup in accord
+                    // with the contain value of the CSS property object-fit.
+                    // SurfaceViewRenderer will fill itself with the video similarly
+                    // to the cover or contain value of the CSS property object-fit
+                    // (which will not matter, eventually).
+                    if (frameHeight == 0 || frameWidth == 0) {
+                        l = t = r = b = 0;
+                    } else {
+                        float frameAspectRatio
+                                = (frameRotation % 180 == 0)
+                                ? frameWidth / (float) frameHeight
+                                : frameHeight / (float) frameWidth;
+                        Point frameDisplaySize
+                                = RendererCommon.getDisplaySize(
                                 scalingType,
                                 frameAspectRatio,
                                 width, height);
 
-                    l = (width - frameDisplaySize.x) / 2;
-                    t = (height - frameDisplaySize.y) / 2;
-                    r = l + frameDisplaySize.x;
-                    b = t + frameDisplaySize.y;
-                }
-                break;
+                        l = (width - frameDisplaySize.x) / 2;
+                        t = (height - frameDisplaySize.y) / 2;
+                        r = l + frameDisplaySize.x;
+                        b = t + frameDisplaySize.y;
+                    }
+                    break;
             }
         }
         surfaceViewRenderer.layout(l, t, r, b);
@@ -379,8 +392,8 @@ public class WebRTCView extends ViewGroup {
         // rotation change. The following will suffice.
         if (!ViewCompat.isInLayout(this)) {
             onLayout(
-                /* changed */ false,
-                getLeft(), getTop(), getRight(), getBottom());
+                    /* changed */ false,
+                    getLeft(), getTop(), getRight(), getBottom());
         }
     }
 
@@ -414,7 +427,7 @@ public class WebRTCView extends ViewGroup {
      */
     public void setObjectFit(String objectFit) {
         ScalingType scalingType
-            = "cover".equals(objectFit)
+                = "cover".equals(objectFit)
                 ? ScalingType.SCALE_ASPECT_FILL
                 : ScalingType.SCALE_ASPECT_FIT;
 
@@ -511,15 +524,15 @@ public class WebRTCView extends ViewGroup {
      */
     public void setZOrder(int zOrder) {
         switch (zOrder) {
-        case 0:
-            surfaceViewRenderer.setZOrderMediaOverlay(false);
-            break;
-        case 1:
-            surfaceViewRenderer.setZOrderMediaOverlay(true);
-            break;
-        case 2:
-            surfaceViewRenderer.setZOrderOnTop(true);
-            break;
+            case 0:
+                surfaceViewRenderer.setZOrderMediaOverlay(false);
+                break;
+            case 1:
+                surfaceViewRenderer.setZOrderMediaOverlay(true);
+                break;
+            case 2:
+                surfaceViewRenderer.setZOrderOnTop(true);
+                break;
         }
     }
 
@@ -565,5 +578,49 @@ public class WebRTCView extends ViewGroup {
 
             rendererAttached = true;
         }
+    }
+
+    public void capture() {
+    }
+
+    private void onCaptureEnd(String filePath) {
+        WritableMap event = Arguments.createMap();
+
+        event.putString("path", filePath);
+
+        this.reactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
+                getId(),
+                "onCaptureEnd",
+                event
+        );
+    }
+
+    private String videoFileName;
+    private VideoFileRenderer videoFileRenderer;
+
+    public void recordingStart() {
+        try {
+            videoFileName = getContext().getCacheDir().getAbsolutePath() + "/" + Instant.now().getEpochSecond() + ".y4m";
+            EglBase.Context sharedContext = EglUtils.getRootEglBaseContext();
+
+            videoFileRenderer = new VideoFileRenderer(videoFileName, frameWidth, frameHeight, sharedContext);
+
+            videoTrack.addSink(videoFileRenderer);
+        } catch (Exception exception) {
+            Log.e("WebRTC", exception.getMessage());
+        }
+    }
+
+    public void recordingStop() {
+        videoFileRenderer.release();
+        videoTrack.removeSink(videoFileRenderer);
+
+        WritableMap event = Arguments.createMap();
+
+        event.putString("path", videoFileName);
+
+        this.reactContext
+                .getJSModule(RCTEventEmitter.class)
+                .receiveEvent(getId(), "onRecordingEnd", event);
     }
 }

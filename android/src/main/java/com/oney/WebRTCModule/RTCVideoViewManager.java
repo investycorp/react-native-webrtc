@@ -1,12 +1,23 @@
 package com.oney.WebRTCModule;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import com.facebook.react.bridge.ReadableArray;
+import com.facebook.react.common.MapBuilder;
 import com.facebook.react.uimanager.annotations.ReactProp;
 import com.facebook.react.uimanager.SimpleViewManager;
 import com.facebook.react.uimanager.ThemedReactContext;
 
+import java.util.Map;
+
 
 public class RTCVideoViewManager extends SimpleViewManager<WebRTCView> {
   private static final String REACT_CLASS = "RTCVideoView";
+
+  public final int COMMAND_CAPTURE = 1;
+  public final int COMMAND_START_RECORDING = 2;
+  public final int COMMAND_STOP_RECORDING = 3;
 
   @Override
   public String getName() {
@@ -16,6 +27,49 @@ public class RTCVideoViewManager extends SimpleViewManager<WebRTCView> {
   @Override
   public WebRTCView createViewInstance(ThemedReactContext context) {
     return new WebRTCView(context);
+  }
+
+  @Nullable
+  @Override
+  public Map<String, Integer> getCommandsMap() {
+    return MapBuilder.of(
+            "capture", COMMAND_CAPTURE,
+            "startRecording", COMMAND_START_RECORDING,
+            "stopRecording", COMMAND_STOP_RECORDING
+    );
+  }
+
+  @Nullable
+  @Override
+  public Map getExportedCustomBubblingEventTypeConstants() {
+    return MapBuilder
+            .builder()
+            .put(
+               "onCaptureEnd", MapBuilder.of("phasedRegistrationNames", MapBuilder.of("bubbled", "onCaptureEnd"))
+            )
+            .put(
+                "onRecordingEnd", MapBuilder.of("phasedRegistrationNames", MapBuilder.of("bubbled", "onRecordingEnd"))
+            )
+            .build();
+  }
+
+  @Override
+  public void receiveCommand(@NonNull WebRTCView root, String commandId, @Nullable ReadableArray args) {
+    super.receiveCommand(root, commandId, args);
+
+    int commandIdInt = Integer.parseInt(commandId);
+
+    switch (commandIdInt) {
+      case COMMAND_CAPTURE:
+        root.capture();
+        break;
+      case COMMAND_START_RECORDING:
+        root.recordingStart();
+        break;
+      case COMMAND_STOP_RECORDING:
+        root.recordingStop();
+        break;
+    }
   }
 
   /**
