@@ -593,13 +593,16 @@ public class WebRTCView extends ViewGroup {
 
         this.recordingStart();
         timer.schedule(timerTask, 1000);
-        this.onCaptureEnd(videoFileName);
+        this.onCaptureEnd();
     }
 
-    private void onCaptureEnd(String filePath) {
+    private void onCaptureEnd() {
+        videoFileRenderer.release();
+        videoTrack.removeSink(videoFileRenderer);
+
         WritableMap event = Arguments.createMap();
 
-        event.putString("path", filePath);
+        event.putString("path", videoFileName);
 
         this.reactContext
                 .getJSModule(RCTEventEmitter.class)
