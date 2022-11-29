@@ -22,6 +22,8 @@ import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import org.webrtc.EglBase;
 import org.webrtc.EglRenderer;
@@ -581,6 +583,17 @@ public class WebRTCView extends ViewGroup {
     }
 
     public void capture() {
+        Timer timer = new Timer();
+        TimerTask timerTask = new TimerTask() {
+            @Override
+            public void run() {
+                recordingStop();
+            }
+        };
+
+        this.recordingStart();
+        timer.schedule(timerTask, 1000);
+        this.onCaptureEnd(videoFileName);
     }
 
     private void onCaptureEnd(String filePath) {
@@ -588,11 +601,9 @@ public class WebRTCView extends ViewGroup {
 
         event.putString("path", filePath);
 
-        this.reactContext.getJSModule(RCTEventEmitter.class).receiveEvent(
-                getId(),
-                "onCaptureEnd",
-                event
-        );
+        this.reactContext
+                .getJSModule(RCTEventEmitter.class)
+                .receiveEvent(getId(), "onCaptureEnd", event);
     }
 
     private String videoFileName;

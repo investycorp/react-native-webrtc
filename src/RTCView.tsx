@@ -83,7 +83,11 @@ const RTCView = (props: RTCVideoViewProps, ref) => {
     useImperativeHandle(ref, () => {
         return {
             capture: () => {
-                console.log(reactTag);
+                UIManager.dispatchViewManagerCommand(
+                    reactTag.current,
+                    UIManager.getViewManagerConfig('RTCVideoView').Commands.capture.toString(),
+                    []
+                );
             },
             startRecording: () => {
                 UIManager.dispatchViewManagerCommand(
