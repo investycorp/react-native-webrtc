@@ -592,7 +592,7 @@ public class WebRTCView extends ViewGroup {
         };
 
         this.recordingStart();
-        timer.schedule(timerTask, 1000);
+        timer.schedule(timerTask, 2000);
         this.onCaptureEnd();
     }
 
