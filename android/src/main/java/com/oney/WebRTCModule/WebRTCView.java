@@ -587,7 +587,6 @@ public class WebRTCView extends ViewGroup {
         TimerTask timerTask = new TimerTask() {
             @Override
             public void run() {
-                recordingStop();
                 onCaptureEnd();
             }
         };
