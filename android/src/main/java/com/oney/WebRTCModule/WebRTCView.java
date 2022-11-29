@@ -588,12 +588,12 @@ public class WebRTCView extends ViewGroup {
             @Override
             public void run() {
                 recordingStop();
+                onCaptureEnd();
             }
         };
 
         this.recordingStart();
         timer.schedule(timerTask, 2000);
-        this.onCaptureEnd();
     }
 
     private void onCaptureEnd() {
